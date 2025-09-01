@@ -57,7 +57,6 @@ ln -si $(pwd)/sysroot/usr/lib/arm-linux-gnueabihf/libperl.so.5.24 sysroot/usr/li
 
 4. install dependencies for OS X
 
-### OS X
 ```shell
 brew install llvm Ninja
 ```
@@ -83,13 +82,14 @@ one example
 cmake --build . -j 8 --target rtsine && scp examples/minimal/rtsine root@bela.local:Bela/projects
 ```
 
-8. try the example in Bela board
+8. try the sine example on Bela board
 ```shell
 ssh root@bela.local 
 ./Bela/projects/rtsine
 ```
 
 
-
-all examples
+9. Build all examples
+```shell
 cmake --build .
+```
