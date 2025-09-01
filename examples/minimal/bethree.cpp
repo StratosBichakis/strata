@@ -2,6 +2,10 @@
 
 #include "BeeThree.h"
 #include "RtAudio.h"
+
+#include "stk-config.h"
+#define RAWWAVES_PATH STK_RAWWAVES_DIR "/rawwaves"
+
 using namespace stk;
 
 // The TickData structure holds all the class instances and data that
@@ -45,7 +49,7 @@ int main()
 {
   // Set the global sample rate and rawwave path before creating class instances.
   Stk::setSampleRate( 44100.0 );
-  Stk::setRawwavePath( "../../rawwaves/" );
+  Stk::setRawwavePath( RAWWAVES_PATH );
 
   TickData data;
   RtAudio dac;

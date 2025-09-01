@@ -3,6 +3,9 @@
 #include "FileLoop.h"
 #include "RtAudio.h"
 
+#include "stk-config.h"
+#define RAWWAVES_PATH STK_RAWWAVES_DIR "/rawwaves"
+
 using namespace stk;
 
 // This tick() function handles sample computation only.  It will be
@@ -23,7 +26,7 @@ int main()
 {
   // Set the global sample rate before creating class instances.
   Stk::setSampleRate( 44100.0 );
-  Stk::setRawwavePath( "../../rawwaves/" );
+  Stk::setRawwavePath( RAWWAVES_PATH );
  
   FileLoop sine;
   RtAudio dac;

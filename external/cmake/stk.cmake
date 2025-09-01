@@ -8,7 +8,7 @@ FetchContent_Populate(
 cmake_path(SET STK_DIR ${stk_SOURCE_DIR})
 cmake_path(SET STK_SOURCE_DIR ${STK_DIR}/src)
 cmake_path(SET STK_INCLUDE_DIR ${STK_DIR}/include)
-cmake_path(SET STK_RAWWAVES_DIR ../..)
+cmake_path(SET STK_RAWWAVES_DIR .)
 # get_filename_component(BELA_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
 configure_file(${CMAKE_CURRENT_LIST_DIR}/stk-config.h.in ${CMAKE_BINARY_DIR}/external/stk-config.h @ONLY)
 
@@ -28,6 +28,7 @@ target_link_directories(stk PUBLIC ${BELA_SYSROOT_PATH_LIST})
 target_link_libraries(stk PUBLIC ${BELA_SYSROOT_LIB_LIST} ${BELA} ${BELA_EXTRA})
 
 target_include_directories(stk PUBLIC
+	${CMAKE_BINARY_DIR}/external
 	${STK_INCLUDE_DIR}
 	PRIVATE
 	${BELA_INCLUDE_DIR}
