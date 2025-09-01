@@ -1,4 +1,4 @@
 // stk-config.h.in
 #pragma once
 
-#define STK_DIR "@STK_DIR@"
+#define STK_RAWWAVES_DIR "@STK_RAWWAVES_DIR@"

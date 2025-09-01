@@ -10,7 +10,10 @@ rsync -rzLR --safe-links \
 ```
 500MB transfer takes a good while (~4 minutes)
 
+```shell
+brew install llvm  
 
+```
 ```
 `brew --prefix llvm`/bin/clang++ \
     --target=arm-linux-gnueabihf \
@@ -25,33 +28,29 @@ rsync -rzLR --safe-links \
     testcross.cpp
 ```
 
-need to make bela lib first
+need to make bela lib first - in bela
 
-```
-ln -s /Users/stratosbichakis/workspace/ongoing/wearcomp-udk/STRATA/sysroot/usr/lib/arm-linux-gnueabihf/libperl.so.5.24 /Users/stratosbichakis/workspace/ongoing/wearcomp-udk/STRATA/sysroot/usr/lib/arm-linux-gnueabihf/libperl.so
-```
 
 
 - need to create symbolic link for perl in  
 sysroot/usr/lib/arm-linux-gnueabihf 
+```
+ln -s sysroot/usr/lib/arm-linux-gnueabihf/libperl.so.5.24 sysroot/usr/lib/arm-linux-gnueabihf/libperl.so
+```
 
 - need to copy files from bela sysroot to 
 ```
 /usr/local/linaro
 ```
 
-
-```
-ln -s 
-```
-
-from cmake-build folder
+- build and copy stk library from cmake-build folder
 
 ```shell
-cmake --build . && scp external/libstk.so root@bela.local:/usr/lib
+cmake --build . --target stk && scp external/libstk.so root@bela.local:/usr/lib
 ```
 
-
+- copy stk rawwaves to bela
 ```shell
 scp -r ../external/stk/rawwaves root@bela.local:.
 ```
+

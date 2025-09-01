@@ -9,7 +9,7 @@
 #include <algorithm>
 
 #include "stk-config.h"
-#define RAWWAVES_PATH STK_DIR "/rawwaves"
+#define RAWWAVES_PATH STK_RAWWAVES_DIR "/rawwaves"
 
 using std::min;
 
