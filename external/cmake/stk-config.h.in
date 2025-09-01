@@ -1,0 +1,4 @@
+// stk-config.h.in
+#pragma once
+
+#define STK_DIR "@STK_DIR@"

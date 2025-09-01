@@ -1,0 +1,2 @@
+find_library(BELA NAMES bela PATHS ${BELA_LIB_DIR} REQUIRED)
+find_library(BELA_EXTRA NAMES belaextra PATHS ${BELA_LIB_DIR} REQUIRED)
