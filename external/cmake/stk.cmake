@@ -1,8 +1,9 @@
 include(FetchContent)
 FetchContent_Populate(
-  stk
-  GIT_REPOSITORY https://github.com/StratosBichakis/stk.git
-  GIT_TAG        e76073f926ec2ffec90124ef51222246831cd4ea # bela-rtAudio branch
+  	stk
+  	GIT_REPOSITORY https://github.com/StratosBichakis/stk.git
+  	GIT_TAG        e76073f926ec2ffec90124ef51222246831cd4ea # bela-rtAudio branch
+	GIT_SHALLOW TRUE
 )
 
 cmake_path(SET STK_DIR ${stk_SOURCE_DIR})
@@ -25,7 +26,7 @@ target_compile_definitions(stk PUBLIC __LINUX_BELA__)
 include(bela-lib)
 
 target_link_directories(stk PUBLIC ${BELA_SYSROOT_PATH_LIST})
-target_link_libraries(stk PUBLIC ${BELA_SYSROOT_LIB_LIST} ${BELA} ${BELA_EXTRA})
+target_link_libraries(stk PUBLIC ${BELA_SYSROOT_LIB_LIST} pthread ${BELA} ${BELA_EXTRA})
 
 target_include_directories(stk PUBLIC
 	${CMAKE_BINARY_DIR}/external

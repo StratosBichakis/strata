@@ -23,8 +23,8 @@ STRATA is a nested portable audio synthesis architecture. The system aims for mo
 
 
 # Getting started
-0. Connect the Bela board over usb
-1. build bela libraries first by remote connecting to bela 
+### 0. Connect the Bela board over usb
+### 1. build bela libraries first by remote connecting to bela 
 type in a terminal
 ```shell
 ssh root@bela.local 
@@ -37,37 +37,20 @@ make lib
 
 <kbd>Ctrl</kbd> + <kbd>D</kbd> to close the connection
 
-2. copy folders from Bela to the local sysroot folder
-from strata folder
+### 2. copy folders from Bela to a newly created folder named sysroot,
+inside your local strata repository folder.
 ``` shell
-rsync -rzLR --safe-links \
-      root@bela.local:/usr/lib/arm-linux-gnueabihf \
-      root@bela.local:/usr/lib/gcc/arm-linux-gnueabihf \
-      root@bela.local:/usr/include \
-      root@bela.local:/lib/arm-linux-gnueabihf \
-      sysroot/ 
+./sync-sysroot.sh
 ```
 500MB transfer takes a good while (~4 minutes)
 
-3. create symbolic link for perl
+### 3. install dependencies for OS X
 
 ```shell
-ln -si $(pwd)/sysroot/usr/lib/arm-linux-gnueabihf/libperl.so.5.24 sysroot/usr/lib/arm-linux-gnueabihf/libperl.so
+brew install llvm lld cmake Ninja wget
 ```
 
-4. install dependencies for OS X
-
-```shell
-brew install llvm Ninja
-```
-
-5. copy stk rawwaves to bela
-
-```shell
-scp -r ../external/stk/rawwaves root@bela.local:.
-```
-
-6. compile stk using cmake
+### 4. compile stk using cmake
 still strata folder
 ```shell
 mkdir build && cd build
@@ -76,20 +59,25 @@ cmake --build . -j 8 --target stk && scp external/libstk.so root@bela.local:/usr
 
 ```
 
-7. compile some example
-one example
+### 5. copy stk rawwaves to bela
+
+```shell
+scp -r ../external/stk/rawwaves root@bela.local:.
+```
+
+### 6. compile one example
 ```shell
 cmake --build . -j 8 --target rtsine && scp examples/minimal/rtsine root@bela.local:Bela/projects
 ```
 
-8. try the sine example on Bela board
+### 7. try the sine example on Bela board
 ```shell
 ssh root@bela.local 
 ./Bela/projects/rtsine
 ```
 
 
-9. Build all examples
+### 10. Build all examples
 ```shell
 cmake --build .
 ```

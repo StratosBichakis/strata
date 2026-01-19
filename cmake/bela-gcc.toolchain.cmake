@@ -1,9 +1,11 @@
-# get_filename_component(BELA_CMAKE_DIR ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
-list(APPEND CMAKE_MODULE_PATH ${BELA_CMAKE_DIR})
+#get_filename_component(BELA_CMAKE_DIR ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
+#list(APPEND CMAKE_MODULE_PATH ${BELA_CMAKE_DIR})
 
 message("using xc-bela-toolchain")
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
+
+set(CMAKE_LINKER_TYPE LLD)
 
 set(triple arm-linux-gnueabihf)
 
@@ -39,18 +41,6 @@ list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES ${XC_SYSROOT})
 set(BELA_LINK_FLAGS "${BELA_LINK_FLAGS} -L${XC_SYSROOT}/usr/lib/gcc/arm-linux-gnueabihf/6.3.0  -B${XC_SYSROOT}/usr/lib/gcc/arm-linux-gnueabihf/6.3.0  -latomic")
 set(BELA_LINK_FLAGS "${BELA_LINK_FLAGS} -Wl,-rpath-link,${XC_SYSROOT}/lib/arm-linux-gnueabihf")
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BELA_LINK_FLAGS}")
-set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${BELA_LINK_FLAGS}")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BELA_LINK_FLAGS}")
-
-cmake_path(SET BELA_SYSROOT_PATH /usr/local/linaro/BelaSysroot)
-
-list(APPEND BELA_SYSROOT_PATH_LIST 
-    "${BELA_SYSROOT_PATH}/usr/lib" 
-    "${BELA_SYSROOT_PATH}/usr/local/lib" 
-    "${BELA_SYSROOT_PATH}/usr/xenomai/lib" 
-    "${BELA_SYSROOT_PATH}/usr/lib/arm-linux-gnueabihf"
-    )
-list(APPEND BELA_SYSROOT_LIB_LIST cobalt asound seasocks prussdrv NE10)
-
-cmake_path(SET BELA_LIB_DIR ${BELA_SYSROOT_PATH}/root/Bela/lib)
+set(CMAKE_EXE_LINKER_FLAGS_INIT "${BELA_LINK_FLAGS}")
+set(CMAKE_MODULE_LINKER_FLAGS_INIT "${BELA_LINK_FLAGS}")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "${BELA_LINK_FLAGS}")

@@ -3,6 +3,7 @@ FetchContent_Populate(
 	oscpp
 	GIT_REPOSITORY https://github.com/kaoskorobase/oscpp.git
 	GIT_TAG        master # oscpp-include
+	GIT_SHALLOW TRUE
 )
 
 cmake_path(SET OSCPP_DIR ${oscpp_SOURCE_DIR}/include)
