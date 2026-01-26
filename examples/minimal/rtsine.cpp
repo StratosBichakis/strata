@@ -15,7 +15,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
   StkFloat *samples = (StkFloat *) outputBuffer;
  
     for ( unsigned int i = 0; i<nBufferFrames; i++ ){
-      float out = 0.01*sine->tick();
+      float out = sine->tick();
       for(int ch = 0; ch < 2; ch++){
       *samples++ = out;
       }

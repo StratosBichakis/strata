@@ -2,6 +2,7 @@
 #list(APPEND CMAKE_MODULE_PATH ${BELA_CMAKE_DIR})
 
 message("using xc-bela-toolchain")
+
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
@@ -30,7 +31,6 @@ else()
     cmake_path(SET XC_ROOT NORMALIZE ${CMAKE_SOURCE_DIR})
     message("defaulting XC_ROOT to current")
 endif()
-
 
 cmake_path(SET XC_SYSROOT ${XC_ROOT}/sysroot)
 message("using envvar XC_SYSROOT  - ${XC_SYSROOT}")

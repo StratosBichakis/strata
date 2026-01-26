@@ -1,18 +1,19 @@
-if((NOT BELA_PATH) AND (DEFINED ENV{BELA_PATH}))
-    cmake_path(SET BELA_PATH $ENV{BELA_PATH})
+#[[if((NOT ${BELA_PATH}) AND (DEFINED ENV{<BELA_PATH>}))
+    cmake_path(SET BELA_PATH $ENV{<BELA_PATH>})
     message(STATUS "ENV BELA_PATH specified, using BELA_PATH: ${BELA_PATH}")
 endif()
 
-if(NOT BELA_PATH)
+if(NOT ${BELA_PATH})]]
     include(FetchContent)
-    FetchContent_Populate(
+    FetchContent_Declare(
         bela
         GIT_REPOSITORY https://github.com/BelaPlatform/Bela.git
         GIT_TAG        master
         GIT_SHALLOW TRUE
     )
+    FetchContent_MakeAvailable(bela)
     cmake_path(SET BELA_PATH "${bela_SOURCE_DIR}")
-endif()
+#endif()
 
 cmake_path(SET BELA_CORE_DIR ${BELA_PATH}/core)
 cmake_path(SET BELA_INCLUDE_DIR ${XC_SYSROOT}/root/Bela/include)
