@@ -2,6 +2,7 @@
  
 #include "SineWave.h"
 #include "RtAudio.h"
+#include  "stk-config.h"
  
 using namespace stk;
  
@@ -17,7 +18,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
     for ( unsigned int i = 0; i<nBufferFrames; i++ ){
       float out = sine->tick();
       for(int ch = 0; ch < 2; ch++){
-      *samples++ = out;
+        *samples++ = out;
       }
   }
   return 0;
@@ -26,7 +27,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 int main()
 {
   // Set the global sample rate before creating class instances.
-  Stk::setSampleRate( 44100.0 );
+  Stk::setSampleRate( atof(RTAUDIO_SAMPLE_RATE) );
  
   SineWave sine;
   RtAudio dac;

@@ -2,7 +2,8 @@
 
 #include "BlitSquare.h"
 #include "RtAudio.h"
- 
+#include "stk-config.h"
+
 using namespace stk;
  
 // This tick() function handles sample computation only.  It will be
@@ -22,7 +23,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 int main()
 {
   // Set the global sample rate before creating class instances.
-  Stk::setSampleRate( 44100.0 );
+  Stk::setSampleRate( atof(RTAUDIO_SAMPLE_RATE) );
  
   BlitSquare osc;
   RtAudio dac;

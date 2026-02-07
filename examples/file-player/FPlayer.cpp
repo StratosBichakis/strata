@@ -7,7 +7,7 @@ namespace stk {
         env_->setDecayTime(0.0);
         env_->setReleaseTime(0.2);
 
-        std::string filePath = "../weaving_player.wav";
+        std::string filePath = "weaving_player.wav";
         file_ = new FileLoop(filePath);
         file_->setRate(1.0);
     }

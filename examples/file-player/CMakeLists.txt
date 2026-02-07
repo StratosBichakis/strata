@@ -1,8 +1,8 @@
 # Add the executable
 add_executable(file-player file-player.cpp FPlayer.cpp)
 target_link_libraries(file-player PRIVATE stk)
+target_include_directories(file-player PRIVATE ${STK_INCLUDE_DIR_LIST})
 
-if(NOT BUILD_FOR_BELA)
+if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
     target_compile_definitions(file-player PUBLIC __MACOSX_CORE__)
-    target_link_libraries(latelybass PRIVATE ${stk-lib} ${Foundation-lib} ${AudioToolbox-lib} ${pthread-lib})
 endif ()

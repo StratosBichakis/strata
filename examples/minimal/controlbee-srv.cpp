@@ -7,15 +7,16 @@
 #include "SKINImsg.h"
 #include <math.h>
 #include <algorithm>
+#include "stk-config.h"
 using std::min;
 
 using namespace stk;
-
+#define RAWWAVES_PATH STK_RAWWAVES_DIR "/rawwaves"
 // The TickData structure holds all the class instances and data that
 // are shared by the various processing functions.
 struct TickData {
   Instrmnt *instrument;
-  WvOut *output;
+  // WvOut *output;
   Messager messager;
   Skini::Message message;
   int counter;
@@ -84,14 +85,14 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
       data->messager.popMessage( data->message );
       if ( data->message.type > 0 ) {
         double tempDouble = data->message.time;
-          if (tempDouble < 0)     {
-              tempDouble = - tempDouble;
-              tempDouble = tempDouble - data->output->getTime();
-          }
-        // if (tempDouble < 0) {
-           // printf("Bad News Here!!!  Backward Absolute Time Required.\n");
-           // tempDouble = 0.0;
-        // }
+          // if (tempDouble < 0)     {
+          //     tempDouble = - tempDouble;
+          //     tempDouble = tempDouble - data->output->getTime();
+          // }
+        if (tempDouble < 0) {
+           printf("Bad News Here!!!  Backward Absolute Time Required.\n");
+           tempDouble = 0.0;
+        }
         data->counter = (long) (tempDouble * Stk::sampleRate());
         // data->counter = (long) (data->message.time * Stk::sampleRate());
         data->haveMessage = true;
@@ -106,7 +107,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
     for ( int i=0; i<counter; i++ ) {
       *samples++ = data->instrument->tick();
       nTicks--;
-      data->output->tick(.0);
+      // data->output->tick(.0);
     }
     if ( nTicks == 0 ) break;
 
@@ -120,14 +121,14 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 int main( int argc, char *argv[] )
 {
   // Set the global sample rate and rawwave path before creating class instances.
-  Stk::setSampleRate( 44100.0 );
-  Stk::setRawwavePath( "../../rawwaves/" );
+  Stk::setSampleRate( atof(RTAUDIO_SAMPLE_RATE) );
+  Stk::setRawwavePath( RAWWAVES_PATH );
 
   TickData data;
   RtAudio dac;
-  FileWvOut output;
+  // FileWvOut output;
 
-  data.output = &output;
+  // data.output = &output;
   // Figure out how many bytes in an StkFloat and setup the RtAudio stream.
   RtAudio::StreamParameters parameters;
   parameters.deviceId = dac.getDefaultOutputDevice();

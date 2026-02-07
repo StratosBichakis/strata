@@ -25,7 +25,7 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 int main()
 {
   // Set the global sample rate before creating class instances.
-  Stk::setSampleRate( 44100.0 );
+  Stk::setSampleRate( atof(RTAUDIO_SAMPLE_RATE) );
   Stk::setRawwavePath( RAWWAVES_PATH );
  
   FileLoop sine;

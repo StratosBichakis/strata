@@ -7,6 +7,18 @@
 #include "SKINImsg.h"
 #include <math.h>
 #include <algorithm>
+#include "stk-config.h"
+
+#define RAWWAVES_PATH STK_RAWWAVES_DIR "/rawwaves"
+
+#ifdef __MACOSX_CORE__
+constexpr int midi_port = -1;
+#else
+constexpr int midi_port = 0;
+#endif
+
+const float sample_rate = atof(RTAUDIO_SAMPLE_RATE);
+
 using std::min;
 
 using namespace stk;
@@ -15,7 +27,6 @@ using namespace stk;
 // are shared by the various processing functions.
 struct TickData {
   Instrmnt *instrument;
-  // WvOut *output;
   Messager messager;
   Skini::Message message;
   int counter;
@@ -104,7 +115,11 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
     data->counter -= counter;
 
     for ( int i=0; i<counter; i++ ) {
-      *samples++ = data->instrument->tick();
+      float out = data->instrument->tick();
+      for (int ch = 0; ch < 2; ch++)
+      {
+        *samples++ = out;
+      }
       nTicks--;
       // data->output->tick(.0);
     }
@@ -120,18 +135,16 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 int main( int argc, char *argv[] )
 {
   // Set the global sample rate and rawwave path before creating class instances.
-  Stk::setSampleRate( 44100.0 );
-  Stk::setRawwavePath( "../../rawwaves/" );
+  Stk::setSampleRate( sample_rate );
+  Stk::setRawwavePath( RAWWAVES_PATH );
 
   TickData data;
   RtAudio dac;
-  // FileWvOut output;
 
-  // data.output = &output;
   // Figure out how many bytes in an StkFloat and setup the RtAudio stream.
   RtAudio::StreamParameters parameters;
   parameters.deviceId = dac.getDefaultOutputDevice();
-  parameters.nChannels = 1;
+  parameters.nChannels = 2;
   RtAudioFormat format = ( sizeof(StkFloat) == 8 ) ? RTAUDIO_FLOAT64 : RTAUDIO_FLOAT32;
   unsigned int bufferFrames = RT_BUFFER_SIZE;
   if ( dac.openStream( &parameters, NULL, format, (unsigned int)Stk::sampleRate(), &bufferFrames, &tick, (void *)&data ) ) {
@@ -147,7 +160,7 @@ int main( int argc, char *argv[] )
     goto cleanup;
   }
 
-  if ( data.messager.startMidiInput(1) == false )
+  if ( data.messager.startMidiInput(midi_port) == false )
     goto cleanup;
 
   if ( dac.startStream() ) {

@@ -2,11 +2,16 @@ include(FetchContent)
 FetchContent_Declare(
   	stk
   	GIT_REPOSITORY https://github.com/StratosBichakis/stk.git
-  	GIT_TAG        e76073f926ec2ffec90124ef51222246831cd4ea # bela-rtAudio branch
+  	GIT_TAG        e6281dc2d272f6e5b5e73d77ae7ad88fc0b4ee9d # bela-rtAudio branch
 	GIT_SHALLOW TRUE
-	SOURCE_SUBDIR     pathThatDoesNotExist
+	SOURCE_SUBDIR     pathThatDoesNotExist #to block from add_subdirectory
 )
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+set(ENABLE_JACK OFF)
 FetchContent_MakeAvailable(stk)
+
+option(RTAUDIO_SAMPLE_RATE 44100.0)
 
 if(BUILD_FOR_BELA)
 	cmake_path(SET STK_DIR ${stk_SOURCE_DIR})
@@ -17,13 +22,13 @@ if(BUILD_FOR_BELA)
 
 	file(GLOB STK_SOURCES
 		${STK_SOURCE_DIR}/*.cpp
-)
+	)
 
 	add_library(stk SHARED ${STK_SOURCES})
 	target_compile_features(stk PRIVATE cxx_std_11)
 
 	#target_compile_definitions(stk PUBLIC __LINUX_BELA__ __RTMIDI_DEBUG__)
-	target_compile_definitions(stk PUBLIC __LINUX_BELA__)
+	target_compile_definitions(stk PUBLIC __LINUX_BELA__ __STK_FLOAT__)
 include(bela-lib)
 
 target_link_directories(stk PUBLIC ${BELA_SYSROOT_PATH_LIST})
@@ -37,24 +42,14 @@ target_include_directories(stk PUBLIC
 )
 else ()
 	if(CMAKE_SYSTEM_NAME STREQUAL Darwin)
-		message("^")
-		set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+		message("${stk_SOURCE_DIR}")
+
 		list(APPEND CMAKE_MODULE_PATH ${stk_SOURCE_DIR}/cmake)
 		add_subdirectory(${stk_SOURCE_DIR} ${stk_BINARY_DIR})
 		set(STK_INCLUDE_DIR ${stk_SOURCE_DIR}/include)
 		set(STK_INCLUDE_DIR_LIST ${stk_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/external/  PARENT_SCOPE)
 		cmake_path(SET STK_RAWWAVES_DIR ${stk_SOURCE_DIR})
-#		find_library(stk-lib NAMES stk PATHS ${stk_BINARY_DIR} REQUIRED)
-#		find_library(Foundation-lib Foundation REQUIRED)
-#		find_library(AudioToolbox-lib AudioToolbox REQUIRED)
-#		find_library(pthread-lib pthread REQUIRED)
-
-#		target_compile_definitions(latelybass PUBLIC __MACOSX_CORE__)
-
-#		target_link_libraries(latelybass PRIVATE ${stk-lib} ${Foundation-lib} ${AudioToolbox-lib} ${pthread-lib})
-
-		# Include the STK headers
-#		target_include_directories(latelybass PRIVATE ${STK_INCLUDE_DIR})
+		set(RTAUDIO_SAMPLE_RATE 48000.0)
 	endif ()
 endif ()
 

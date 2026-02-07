@@ -2,3 +2,4 @@
 #pragma once
 
 #define STK_RAWWAVES_DIR "@STK_RAWWAVES_DIR@"
+#define RTAUDIO_SAMPLE_RATE "@RTAUDIO_SAMPLE_RATE@"

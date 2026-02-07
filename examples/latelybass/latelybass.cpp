@@ -139,7 +139,7 @@ int main( int argc, char *argv[] )
 {
   if ( argc != 2 ) usage();
   // Set the global sample rate and rawwave path before creating class instances.
-  Stk::setSampleRate( 48000.0 );
+  Stk::setSampleRate( atof(RTAUDIO_SAMPLE_RATE) );
   Stk::setRawwavePath( RAWWAVES_PATH );
 
   TickData data;

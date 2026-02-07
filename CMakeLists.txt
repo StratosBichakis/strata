@@ -11,8 +11,8 @@ include(perl)
 add_subdirectory(external)
 
 add_subdirectory(examples/minimal)
-#add_subdirectory(examples/file-player)
-#add_subdirectory(examples/latelybass)
+add_subdirectory(examples/file-player)
+add_subdirectory(examples/latelybass)
 
 if(BUILD_FOR_BELA)
 add_subdirectory(examples/trill/trill-cli-one)
@@ -21,3 +21,5 @@ add_subdirectory(examples/trill/trill-osc)
 add_subdirectory(examples/trill/trill-perl-cli)
 add_subdirectory(examples/trill/trill-perl-cli-one)
 endif ()
+
+add_subdirectory(examples/bead-controller)
