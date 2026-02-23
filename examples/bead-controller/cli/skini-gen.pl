@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-sub run {
+sub bang {
     my @values = @_;
     # turn 30 floats into binary string
     my $binary = pack("f*", @values);

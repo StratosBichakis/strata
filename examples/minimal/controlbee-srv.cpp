@@ -105,7 +105,10 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
     data->counter -= counter;
 
     for ( int i=0; i<counter; i++ ) {
-      *samples++ = data->instrument->tick();
+      float out = data->instrument->tick();
+      for(int ch = 0; ch < 2; ch++){
+        *samples++ = out;
+      }
       nTicks--;
       // data->output->tick(.0);
     }
@@ -132,7 +135,7 @@ int main( int argc, char *argv[] )
   // Figure out how many bytes in an StkFloat and setup the RtAudio stream.
   RtAudio::StreamParameters parameters;
   parameters.deviceId = dac.getDefaultOutputDevice();
-  parameters.nChannels = 1;
+  parameters.nChannels = 2;
   RtAudioFormat format = ( sizeof(StkFloat) == 8 ) ? RTAUDIO_FLOAT64 : RTAUDIO_FLOAT32;
   unsigned int bufferFrames = RT_BUFFER_SIZE;
   if ( dac.openStream( &parameters, NULL, format, (unsigned int)Stk::sampleRate(), &bufferFrames, &tick, (void *)&data ) ) {
