@@ -27,9 +27,9 @@ static PerlInterpreter *my_perl;
 
 // Struct to hold bang details
 struct BangDetails {
-    int num_bangs;
-    double tempo;
-    long last_tempo_change;
+    // int bangs;
+    // double tempo;
+    // long last_tempo_change;
     double current_unix_time;
     std::string message;
 };
@@ -134,7 +134,7 @@ public:
         }
     }
 
-    void call_perl_bang(BangDetails& details, SV* message_sv) {
+    void call_perl_tick(BangDetails& details, SV* message_sv) {
         dTHX;
         dSP;
         ENTER;
@@ -142,22 +142,20 @@ public:
 
         // Sync C++ struct values TO the persistent Perl hash before calling
         HV* hv = (HV*)SvRV(perl_state_hv_ref);
-        hv_stores(hv, "num_bangs", newSViv(details.num_bangs));
         hv_stores(hv, "current_unix_time", newSVnv(details.current_unix_time));
-        // Note: We don't overwrite 'is_accelerating' here so Perl keeps its state
 
         PUSHMARK(SP);
         XPUSHs(perl_state_hv_ref); // Pass the persistent hash
         XPUSHs(sv_2mortal(message_sv));
         PUTBACK;
 
-        call_pv("bang", G_DISCARD);
+        call_pv("tick", G_DISCARD);
 
         SPAGAIN;
         // After call, pull ONLY what C++ needs back into the struct
         SV** sv_tempo = hv_fetchs(hv, "tempo", 0);
-        if (sv_tempo) details.tempo = SvNV(*sv_tempo);
-
+        // if (sv_tempo) details.tempo = SvNV(*sv_tempo);
+        // std::cout << "C++ DEBUG - Tempo : " << details.tempo << std::endl;
         SV** sv_msg = hv_fetchs(hv, "message", 0);
         if (sv_msg) details.message = SvPV_nolen(*sv_msg);
 
@@ -168,12 +166,8 @@ public:
 
 
     void run() {
-        BangDetails details = {0, 120.0, 0};
+        BangDetails details = {0};
         std::vector<std::string> my_scripts = {"bang.pl" };
-        auto start_time = std::chrono::steady_clock::now();
-        double tempo = 120.0;
-        int num_bangs = 0;
-
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_real_distribution<float> dis(0.0, 1.0);
@@ -187,22 +181,7 @@ public:
                         reload_perl_script(script.c_str());
                     }
                 }
-                // Check if tempo has changed
-                if (details.tempo != tempo) {
-                    // time of the last bang
-                    double old_interval = 60.0 / (details.tempo*8.0);
-
-                    auto last_bang_time_double = start_time + std::chrono::duration<double>(num_bangs * old_interval);
-                    start_time = std::chrono::time_point_cast<std::chrono::steady_clock::duration>(last_bang_time_double);
-
-                    tempo = details.tempo;
-                    details.last_tempo_change = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                    num_bangs = 0;
-                }
-
-                details.num_bangs++;
-                num_bangs++;
-
+                
                 // Create a Perl array (AV) of 32 random floats
                 AV* message_av = newAV();
                 for (int i = 0; i < 32; ++i) {
@@ -210,38 +189,15 @@ public:
                 }
                 SV* message_sv = newRV_inc(reinterpret_cast<SV*>(message_av));
 
-                details.current_unix_time = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+                details.current_unix_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-                /*
-                std::cout << "C++ before: bangs=" << details.num_bangs
-                          << ", tempo=" << details.tempo
-                          << ", last_change=" << details.last_tempo_change << std::endl;
-                std::cerr << "DEBUG C++: details.tempo before Perl call = " << details.tempo << std::endl;
-                */
-                // Pseudo-code: Check if the file was modified or a key was pressed
-
-                call_perl_bang(details, message_sv);
-                /*
-                std::cerr << "DEBUG C++: details.tempo after Perl call = " << details.tempo << std::endl;
-                std::cout << "C++ after: bangs=" << details.num_bangs
-                          << ", tempo=" << details.tempo
-                          << ", last_change=" << details.last_tempo_change << std::endl;
-                */
+                call_perl_tick(details, message_sv);
+                
                 if (!details.message.empty()) {
                     send_message(details.message);
                 }
 
-                double interval = 60.0 / (details.tempo*8.0);
-
-                auto next_bang_time_double = start_time + std::chrono::duration<double>(num_bangs * interval);
-                auto next_bang_time = std::chrono::time_point_cast<std::chrono::steady_clock::duration>(next_bang_time_double);
-
-                auto now = std::chrono::steady_clock::now();
-                auto sleep_duration = next_bang_time - now;
-
-                if (sleep_duration.count() > 0) {
-                    std::this_thread::sleep_for(sleep_duration);
-                }
+                std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>( 64 / 48000.0))); // Approximately 1.333ms
             }
         } catch (const std::exception& e) {
             std::cerr << "Error during message sending: " << e.what() << std::endl;
@@ -278,6 +234,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
-    
+
+    perl_destruct(my_perl);
+    perl_free(my_perl);
     return 0;
 }
