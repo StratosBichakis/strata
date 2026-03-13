@@ -30,7 +30,7 @@ sub tick {
 
     # Define the interval at which a 'bang' should occur based on tempo
     # Original C++ calculation: double interval = 60.0 / (details.tempo*8.0);
-    my $bang_interval_seconds = 60.0 / ($self->{tempo}) ;
+    my $bang_interval_seconds = 60.0 / ($self->{tempo}*6) ;
 
     # Accumulate time
     $self->{time_since_last_bang_check} += $time_delta;

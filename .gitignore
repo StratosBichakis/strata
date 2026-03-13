@@ -4,7 +4,8 @@
 CMakeUserPresets.json
 # Linux trash folder which might appear on any partition or disk
 .Trash-*
-
+_sync-sysroot.sh
+examples/perlembed/bang-cli/_bang.pl
 ##### MacOS
 # General
 .DS_Store

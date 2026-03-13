@@ -1,4 +1,4 @@
-# STRATA
+# strata
 Synthesis Toolkit for Real-time Audio Tactile Applications
 
 by Stratos Bichakis
