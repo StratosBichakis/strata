@@ -1,42 +1,57 @@
 use strict;
 use warnings;
 
-use lib '.';
-require "helpers.pl";
+use lib ".";
+require './helpers.pl';
 
-# Renamed from 'bang' to '_bang_event' - this is the actual event trigger logic
-sub _bang {
-    my ($self, $message_from_c) = @_;
+sub _bang_event {
+    my ($self) = @_;
 
-    my $bangs = $self->{bangs};
-    my $tempo = $self->{tempo};
-    $self->{tempo} = 134.4;
+    my $c_1 = $self->{clocks}->{"main"};
+    my $c_2 = $self->{clocks}->{"sec"};
 
-#     do "helpers.pl";
-    my @floats;
-    if (ref($message_from_c) eq 'ARRAY') {
-        @floats = @{$message_from_c};
-    } else {
-        # This case should not happen if C++ is always sending an array ref
-        # print STDERR "Perl received a non-array message: '$message_from_c'\n";
-    }
-    $self->{counter} //= 0; #unless (defined $self->{counter});
+    pattern($c_1, "simple", [0.5, 0.25, 0.25, 0.444], sub {
+        play($self, $c_1, 72, 0.1);
+    });
 
+    sched($c_1, "lo", sub {
+        play($self, $c_1, 65, 0.3);
+        return 0.4432;
+    });
 
-    my @notes = (42, 43, 45, 47, 48, 45, 47, 45, 47, 43, 45, 43);
-#     my @notes = (42, 43, 45);
-    $self->{counter}++ if ($bangs % 2 == 0);
+#     once($self, "do_", sub {
+#         play($self, $c_1, 45, 0.1);
+#     });
 
-    my $note = $notes[$self->{counter}%@notes]; # Use int for array index
-#     my $note = $notes[int($floats[0]*@notes)]; # Use int for array index
-    my @vels = (1, 0.2, 0.5);
+    loop($c_2, 12, 7.7, sub {
+        play($self, $c_2, 53, 0.5);
+    });
+}
 
-    my $vel = $floats[1]*127*$vels[$self->{counter} % @vels];
-    my $dur = $floats[$#floats]*0.01;
-    $self->{message} = ($bangs % 2 == 0)
-            ? "NoteOn 0 1 $note $vel\r\n"
-            : "NoteOff 0 1 $note 67\r\n";
-    return;
+sub clock {
+    my ($self, $name, $tempo) = @_;
+    $self->{clocks} //= {};
+
+    my $c = $self->{clocks}->{$name} //= { accumulated_beats => 0, tempo => $tempo // 120};
+    $c->{tempo} = $tempo // $c->{tempo};
+
+    my $delta_sec = $self->{current_unix_time} - $self->{last_unix_time};
+    $c->{previous_beats} = $c->{accumulated_beats};
+    $c->{accumulated_beats} += $delta_sec * ($c->{tempo} / 60);
+}
+
+sub tick {
+    my ($self, $msg) = @_;
+    $self->{last_unix_time} //= $self->{current_unix_time};
+    $self->{message} = "";
+#     do "./helpers.pl";
+    clock($self, "main", 136);
+    clock($self, "sec", 125);
+
+    _bang_event($self);
+    process_queue($self);
+
+    $self->{last_unix_time} = $self->{current_unix_time};
 }
 
 1;

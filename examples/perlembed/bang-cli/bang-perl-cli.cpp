@@ -183,6 +183,7 @@ public:
                 }
                 
                 // Create a Perl array (AV) of 32 random floats
+
                 AV* message_av = newAV();
                 for (int i = 0; i < 32; ++i) {
                     av_push(message_av, newSVnv(dis(gen)));
@@ -192,12 +193,13 @@ public:
                 details.current_unix_time = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
 
                 call_perl_tick(details, message_sv);
-                
+
                 if (!details.message.empty()) {
                     send_message(details.message);
                 }
 
                 std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>( 64 / 48000.0))); // Approximately 1.333ms
+                // std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>( 4800 / 48000.0))); // Approximately 1.333ms
             }
         } catch (const std::exception& e) {
             std::cerr << "Error during message sending: " << e.what() << std::endl;

@@ -27,6 +27,12 @@
       "displayName": "OS X-only configuration",
       "description": "This build is only available on OS X",
       "binaryDir": "${sourceDir}/cmake-build/darwin",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": {
+          "value": "Debug",
+          "type": "STRING"
+        }
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -44,6 +50,10 @@
         "BUILD_FOR_BELA": {
           "value": "ON",
           "type": "BOOL"
+        },
+        "CMAKE_BUILD_TYPE": {
+          "value": "Release",
+          "type": "STRING"
         }
       }
     }

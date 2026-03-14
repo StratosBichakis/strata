@@ -1,51 +1,120 @@
 use strict;
 use warnings;
 
-# New tick function, called every 1ms from C++
-sub tick {
-    my ($self, $message_from_c) = @_;
+our $LATENCY = 0.05;
 
-    # Initialize state variables within the persistent hash
-    $self->{last_tick_time} = $self->{current_unix_time} unless defined $self->{last_tick_time}; # Use C++ time for first init
-    $self->{bangs} = 0 unless defined $self->{bangs};
-    $self->{tempo} = 120.0 unless defined $self->{tempo}; # Default tempo
-    $self->{time_since_last_bang_check} = 0.0 unless defined $self->{time_since_last_bang_check};
-    $self->{last_tempo_change} = $self->{current_unix_time} unless defined $self->{last_tempo_change}; # Initialize with current time
-    $self->{_previous_tempo} = $self->{tempo} unless defined $self->{_previous_tempo}; # Initialize to current tempo
+# # --- Core Math ---
+# sub f_mod {
+#     my ($x, $y) = @_;
+#     my $f = $x / $y;
+#     return ($f - int($f)) * $y;
+# }
 
-    my $current_c_time = $self->{current_unix_time}; # Time from C++
+# # --- 1. CLOCK SCHEDULER (Imperative) ---
+sub sched {
+    my ($clock, $name, $code) = @_;
+    $clock->{shreds} //= {};
+    my $s = $clock->{shreds}->{$name} //= { next => $clock->{accumulated_beats} };
 
-    # Calculate time difference since last tick (in seconds)
-    my $time_delta = $current_c_time - $self->{last_tick_time};
-    $self->{last_tick_time} = $current_c_time; # Update for next tick
-
-    # Check for tempo change and update last_tempo_change
-#     if ($self->{tempo} != $self->{_previous_tempo}) {
-#         $self->{last_tempo_change} = $current_c_time;
-#         $self->{_previous_tempo} = $self->{tempo};
-#         # Optionally reset bangs and time_since_last_bang_check on tempo change
-# #         $self->{bangs} = 0;
-#         $self->{time_since_last_bang_check} = 0.0;
-#     }
-
-    # Define the interval at which a 'bang' should occur based on tempo
-    # Original C++ calculation: double interval = 60.0 / (details.tempo*8.0);
-    my $bang_interval_seconds = 60.0 / ($self->{tempo}*6) ;
-
-    # Accumulate time
-    $self->{time_since_last_bang_check} += $time_delta;
-
-    # Check if enough time has passed to trigger a 'bang'
-    if ($self->{time_since_last_bang_check} >= $bang_interval_seconds) {
-        $self->{bangs}++; # Increment bang counter
-#         print STDERR "Perl Bang! bangs: " . $self->{bangs} . "\n";
-        _bang($self, $message_from_c); # Call the event logic
-        # Subtract the interval to handle potential overshoot and keep timing consistent
-        $self->{time_since_last_bang_check} -= $bang_interval_seconds;
+    while ($s->{next} <= $clock->{accumulated_beats}) {
+        my $dur = $code->($s);
+        $dur //= 1.0; # Default 1 beat
+        $s->{next} += $dur;
     }
-
-    # Any other 1ms-based logic can go here
-    return;
 }
 
-1; # Crucial: require files must return true
+# --- 2. SC PATTERN (Declarative) ---
+sub pattern {
+    my ($clock, $name, $durs, $code) = @_;
+    $clock->{patterns} //= {};
+    my $p = $clock->{patterns}->{$name} //= { next => $clock->{accumulated_beats}, idx => 0 };
+
+    while ($p->{next} <= $clock->{accumulated_beats}) {
+        $code->($p);
+        my $dur = $durs->[$p->{idx} % scalar(@$durs)];
+        $p->{next} += $dur;
+        $p->{idx}++;
+    }
+}
+
+# --- 3. PHASE CROSS (Spatial) ---
+sub loop {
+    my ($clock, $point, $div, $code) = @_;
+    my $old = $clock->{previous_beats} // $clock->{accumulated_beats};
+    my $new = $clock->{accumulated_beats};
+
+    # Check if we crossed an integer multiple of $point
+    if (int($old * $div / $point) < int($new * $div / $point)) {
+        $code->();
+    }
+}
+
+# --- Queue Logic with Pattern Matching ---
+sub process_queue {
+    my ($self) = @_;
+    $self->{queue} //= [];
+
+    my @future;
+
+    foreach my $item (@{$self->{queue}}) {
+        # $item is a string: "BEAT_TIME|SKINI_MSG"
+        # Example: "10.5|NoteOff 0.0000 1 60 0"
+        my ($target_beat, $skini) = ($item->{beat_time}, $item->{message});
+        my $now = $item->{clock}->{accumulated_beats};
+        my $bps = $item->{clock}->{tempo} / 60.0;
+
+        if ($now >= $target_beat) {
+            # 1. Calculate the fresh delta in seconds
+            my $delta = (($target_beat - $now) / $bps);
+            $delta = 0 if $delta < 0;
+
+            # 2. Regex to substitute the time field
+            # SKINI format: MessageType Time Channel Data...
+            # This regex captures the first word, then replaces the second word (the time).
+            $skini =~ s/^(\S+)\s+\S+/$1 . sprintf(" %.6f", $delta)/e;
+
+            $self->{message} .= $skini . "\r\n";
+        } else {
+            push @future, $item;
+        }
+    }
+    $self->{queue} = \@future;
+}
+
+sub play {
+    my ($self, $clock, $note, $dur_beats) = @_;
+    my $target_beat = $clock->{accumulated_beats};
+    # 1. Immediate NoteOn
+    my $bps = $clock->{tempo} / 60.0;
+    my $on_delta = (($target_beat - $clock->{accumulated_beats}) / $bps);
+    $self->{message} .= sprintf("NoteOn %.6f 1 %d 100\r\n", $on_delta, $note);
+
+    # 2. Store NoteOff in queue
+    my $off_beat = $target_beat + $dur_beats;
+
+    my $skini_template = "NoteOff 0.000000 1 $note 0";
+    push @{$self->{queue}}, {
+        message => "$skini_template",
+        clock => $clock,
+        beat_time => $off_beat
+        };
+}
+
+sub once {
+    my ($self, $key, $code) = @_;
+    $self->{once_registry} //= {};
+
+    if (!$self->{once_registry}->{$key}) {
+        $code->();
+        $self->{once_registry}->{$key} = 1;
+    }
+}
+
+sub once_reset {
+    my ($self, $key) = @_;
+    if ($self->{once_registry}->{$key}){
+        $self->{once_registry}->{$key} = 0;
+    }
+}
+
+1;
