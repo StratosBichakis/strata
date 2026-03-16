@@ -11,7 +11,7 @@ sub _bang_event {
     my $c_2 = $self->{clocks}->{"sec"};
 
     pattern($c_1, "simple", [0.5, 0.25, 0.25, 0.444], sub {
-        play($self, $c_1, 72, 0.1);
+        play($self, $c_1, 45, 0.1);
     });
 
     sched($c_1, "lo", sub {

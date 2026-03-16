@@ -1,4 +1,4 @@
-package Strata;
+package strata;
 use strict;
 use warnings;
 
@@ -7,4 +7,4 @@ sub process {
     return $val * 2;
 }
 
-1; # Required so Perl knows the file loaded successfully
+1;
