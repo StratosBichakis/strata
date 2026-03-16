@@ -2,68 +2,50 @@
 #include <cmath>
 
 TrillBaseFilter::TrillBaseFilter(float pole, float thresh)
-    : threshold(thresh), lastValue(0.0f), baseline(0.0f)
+    : threshold_(thresh), last_value_(0.0f), baseline_(0.0f)
 {
-    filter.setPole(pole);
-    baselineFilter.setPole(0.9995f);
-
-    // Configure OneZero as a differentiator: y[n] = x[n] - x[n-1]
-    // Setting the zero to 1.0 creates a High-Pass response.
-    deltaFilter.setZero(1.0f);
+    filter_.setPole(pole);
+    baseline_filter_.setPole(0.9995f);
 }
 
-float TrillBaseFilter::update(float input)
+float TrillBaseFilter::process(float input)
 {
     // 1. Baseline tracking
-    if (std::abs(input - baseline) < 0.05f)
+    if (std::abs(input - baseline_) < 0.05f)
     {
-        baseline = baselineFilter.tick(input);
+        baseline_ = baseline_filter_.tick(input);
     }
 
     // 2. Subtract Baseline & Clamp
-    float deBasalized = std::max(0.0f, input - baseline);
+    float deBasalized = std::max(0.0f, input - baseline_);
 
     // 3. Noise Gate
-    float cleanInput = (deBasalized < threshold) ? 0.0f : deBasalized;
+    float cleanInput = (deBasalized < threshold_) ? 0.0f : deBasalized;
 
     // 4. STK Smoothing (OnePole)
-    lastValue = filter.tick(cleanInput);
-
-    // 5. STK Delta/Velocity (OneZero)
-    // We tick the smoothed value through the OneZero to get the 'Influence'
-    deltaFilter.tick(lastValue);
-
-    return lastValue;
-}
-
-float TrillBaseFilter::getDelta() const
-{
-    // Returns the result of the last differentiator calculation
-    return deltaFilter.lastOut();
-}
-
-float TrillBaseFilter::getLastValue() const
-{
-    return lastValue;
-}
-
-float TrillBaseFilter::getBaseline() const
-{
-    return baseline;
-}
-
-void TrillBaseFilter::setSmoothing(float pole)
-{
-    filter.setPole(pole);
+    last_value_ = filter_.tick(cleanInput);
+    return last_value_;
 }
 
 void TrillBaseFilter::recalibrate(float currentInput)
 {
-    baseline = currentInput;
-    baselineFilter.clear();
-    baselineFilter.tick(currentInput);
+    baseline_ = currentInput;
+    baseline_filter_.clear();
+    baseline_filter_.tick(currentInput);
+    filter_.clear();
+    last_value_ = 0.0f;
+}
 
-    filter.clear();
-    deltaFilter.clear();
-    lastValue = 0.0f;
+float TrillBaseFilter::get_last_value() const { return last_value_; }
+float TrillBaseFilter::get_baseline() const { return baseline_; }
+void TrillBaseFilter::set_smoothing(float pole) { filter_.setPole(pole); }
+
+TrillDeltaFilter::TrillDeltaFilter() {
+    // Configure OneZero as a differentiator by setting the zero to 1.0
+    // Equation: y[n] = x[n] - (1.0 * x[n-1])
+    this->setB1(-1.0f);
+}
+
+float TrillDeltaFilter::process(float input) {
+    return this->tick(input);
 }

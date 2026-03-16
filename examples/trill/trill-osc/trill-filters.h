@@ -12,29 +12,26 @@ class TrillBaseFilter {
 public:
     TrillBaseFilter(float pole = 0.9f, float thresh = 0.02f);
 
-    float update(float input);
-
-    float getDelta() const;
-    float getLastValue() const;
-    float getBaseline() const;
-    void setSmoothing(float pole);
+    float process(float input);
+    float get_last_value() const;
+    float get_baseline() const;
+    void set_smoothing(float pole);
     void recalibrate(float currentInput);
 
 private:
-    stk::OnePole filter;
-    stk::OnePole baselineFilter;  // Ultra-slow filter for drift tracking
-    stk::OneZero deltaFilter;   // Velocity/Influence (High-pass/Differentiator)
+    stk::OnePole filter_;
+    stk::OnePole baseline_filter_;  // Ultra-slow filter for drift tracking
 
-    float threshold;
-    float lastValue;
-    float baseline;
+    float threshold_;
+    float last_value_;
+    float baseline_;
 };
 
 
-class TrillDeltaFilter : public stk::OnePole
+class TrillDeltaFilter : public stk::OneZero
 {
     public: TrillDeltaFilter();
-
+    float process(float input);
 };
 
 #endif

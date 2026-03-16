@@ -22,12 +22,13 @@ private:
     struct sockaddr_in server_addr;
     struct sockaddr_in local_addr; // For receiving
 
-    std::vector<TrillBaseFilter> processors;
-    Influx influx;
+    std::vector<TrillBaseFilter> base_filters_;
+    std::vector<TrillDeltaFilter> delta_filters_;
+    Influx influx_;
+    std::vector<LeakyIntegrator> parameter_integrators_;
     // We'll use these to store the results before sending OSC
-    std::vector<float> processedValues;
-    std::vector<float> deltaValues;
-    std::vector<float> accValues;
+    std::vector<float> processed_values_;
+    std::vector<float> delta_values_;
 
 
     void handle_incoming_osc() {
@@ -55,8 +56,8 @@ private:
                         if (!args.atEnd()) {
                             float newPole = args.next<float>();
 
-                            for(auto &p : processors) {
-                                p.setSmoothing(newPole);
+                            for(auto &p : base_filters_) {
+                                p.set_smoothing(newPole);
                             }
                             std::cout << "Smoothing updated to: " << newPole << std::endl;
                         }
@@ -66,29 +67,31 @@ private:
                         if (!args.atEnd()) {
                             // Randomize with a specific seed provided by SuperCollider
                             unsigned int newSeed = (unsigned int)args.next<int32_t>();
-                            influx.randomize(newSeed);
+                            influx_.randomize(newSeed);
                             std::cout << "Matrix re-seeded with: " << newSeed << std::endl;
                         } else {
                             std::random_device rd;
                             unsigned int randomSeed = rd();
-                            influx.randomize(randomSeed);
+                            influx_.randomize(randomSeed);
                         }
                     }
                     else if (addr == "/set_leak") {
                         auto args = msg.args();
                         if (!args.atEnd()) {
-                            float leakValue = args.next<float>(); // e.g., 0.99 for slow, 0.8 for fast
-                            influx.setLeak(leakValue);
+                            float leakValue = args.next<float>();
+                            for(auto &li : parameter_integrators_) {
+                                li.setLeak(leakValue);
+                            }
                             std::cout << "Leak Coefficient updated: " << leakValue << std::endl;
                         }
                     }
                     else if (addr == "/freeze") {
                         auto args = msg.args();
                         if (!args.atEnd()) {
-                            // OSC booleans are often sent as ints (0 or 1)
                             bool freezeState = (args.next<int32_t>() > 0);
-                            influx.setFrozen(freezeState);
-                            std::cout << "Freeze mode: " << (freezeState ? "ON" : "OFF") << std::endl;
+                            for(auto &li : parameter_integrators_) {
+                                li.setFrozen(freezeState);
+                            }
                         }
                     }
                 }
@@ -101,14 +104,13 @@ private:
     void trigger_recalibrate() {
         touchSensor.readI2C();
         for (size_t i = 0; i < touchSensor.rawData.size(); ++i) {
-            processors[i].recalibrate(touchSensor.rawData[i]);
-            accValues[i] = 0.0f;
+            base_filters_[i].recalibrate(touchSensor.rawData[i]);
         }
         std::cout << "Baseline recalibrated for all 30 pins." << std::endl;
     }
 
 public:
-    TrillClientUDP(const char* ip, int port) : processedValues(30, 0.0f), deltaValues(30, 0.0f), accValues(30, 0.0f), influx(30, 8, 1234) {
+    TrillClientUDP(const char* ip, int port) : processed_values_(30, 0.0f), delta_values_(30, 0.0f), influx_(30, 8, 1234) {
         sock = socket(AF_INET, SOCK_DGRAM, 0);
         if (sock < 0)
             throw std::runtime_error("Failed to create UDP socket");
@@ -131,10 +133,15 @@ public:
         }
 
         // Initialize 30 processors (for Trill Craft)
-        processedValues.resize(30);
-        deltaValues.resize(30);
+        processed_values_.resize(30);
+        delta_values_.resize(30);
         for(int i = 0; i < 30; ++i) {
-            processors.emplace_back(0.3f, 0.02f);
+            base_filters_.emplace_back(0.3f, 0.02f);
+            delta_filters_.emplace_back(); // Initialize the differentiators
+        }
+
+        for(int i = 0; i < 8; ++i) {
+            parameter_integrators_.emplace_back(0.995f, 0.5f);
         }
 
     }
@@ -179,20 +186,29 @@ public:
                 handle_incoming_osc();
 
                 if(touchSensor.readI2C() == 0) {
+                    // 1. Spatial Filtering (Input side)
                     for (size_t i = 0; i < touchSensor.rawData.size(); ++i) {
-                        processedValues[i] = processors[i].update(touchSensor.rawData[i]);
-                        deltaValues[i] = processors[i].getDelta();
-
-                        // float sensitivity = 5.0f;
-                        // accValues[i] += deltaValues[i] * sensitivity;
+                        processed_values_[i] = base_filters_[i].process(touchSensor.rawData[i]);
+                        delta_values_[i] = delta_filters_[i].process(processed_values_[i]);
                     }
 
-                    // Influx Mapping
-                    influx.process(deltaValues); //
+                    // 2. Mapping Stage
+                    // This returns a vector of 8 "influences"
+                    std::vector<float> influences = influx_.process(delta_values_);
 
-                    send_osc_raw_values("/trill/raw", processedValues);
-                    // send_osc_raw_values("/trill/delta", deltaValues);
-                    send_osc_raw_values("/trill/influx", influx.getOutputs());
+                    // 3. Temporal Integration Stage (Output side)
+                    std::vector<float> integrated_outputs(8);
+                    float global_sensitivity = 2.5f; // Adjust as needed
+
+                    for (int i = 0; i < 8; ++i) {
+                        // Each integrator tracks the state of one parameter
+                        integrated_outputs[i] = parameter_integrators_[i].process(influences[i] * global_sensitivity);
+                    }
+
+                    // 4. Send the integrated parameter values
+                    send_osc_raw_values("/trill/raw", processed_values_);
+                    // send_osc_raw_values("/trill/delta", delta_values_);
+                    send_osc_raw_values("/trill/influx", integrated_outputs);
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(11));
             }
