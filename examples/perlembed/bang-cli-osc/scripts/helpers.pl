@@ -57,8 +57,6 @@ sub process_queue {
     my @future;
 
     foreach my $item (@{$self->{queue}}) {
-        # $item is a string: "BEAT_TIME|SKINI_MSG"
-        # Example: "10.5|NoteOff 0.0000 1 60 0"
         my ($target_beat, $skini) = ($item->{beat_time}, $item->{message});
         my $now = $item->{clock}->{accumulated_beats};
         my $bps = $item->{clock}->{tempo} / 60.0;

@@ -11,6 +11,8 @@
 #include "libraries/Trill/Trill.h"
 #include <oscpp/client.hpp>
 #include <oscpp/server.hpp>
+
+#include "trill-config.h" // Add this include
 #include "trill-filters.h"
 #include "influx.h"
 #include "random"
@@ -20,6 +22,7 @@ private:
     Trill touchSensor;
     int sock;
     struct sockaddr_in server_addr;
+    struct sockaddr_in plot_addr;
     struct sockaddr_in local_addr; // For receiving
 
     std::vector<TrillBaseFilter> base_filters_;
@@ -30,6 +33,7 @@ private:
     std::vector<float> processed_values_;
     std::vector<float> delta_values_;
 
+    std::vector<float> pin_weights_ = INPUT_WEIGHTS; // Store weights
 
     void handle_incoming_osc() {
         uint8_t rx_buffer[1024];
@@ -103,14 +107,18 @@ private:
 
     void trigger_recalibrate() {
         touchSensor.readI2C();
-        for (size_t i = 0; i < touchSensor.rawData.size(); ++i) {
-            base_filters_[i].recalibrate(touchSensor.rawData[i]);
+        for (int i = 0; i < NUM_ACTIVE_INPUTS; ++i) {
+            int pinIdx = ACTIVE_PINS[i];
+            base_filters_[i].recalibrate(touchSensor.rawData[pinIdx]);
         }
-        std::cout << "Baseline recalibrated for all 30 pins." << std::endl;
+        std::cout << "Baseline recalibrated for active pins." << std::endl;
     }
 
 public:
-    TrillClientUDP(const char* ip, int port) : processed_values_(30, 0.0f), delta_values_(30, 0.0f), influx_(30, 8, 1234) {
+    TrillClientUDP(const char* ip, int port) :
+    processed_values_(NUM_ACTIVE_INPUTS, 0.0f),
+    delta_values_(NUM_ACTIVE_INPUTS, 0.0f),
+    influx_(NUM_ACTIVE_INPUTS, NUM_OUTPUT_CHANNELS, 1234) {
         sock = socket(AF_INET, SOCK_DGRAM, 0);
         if (sock < 0)
             throw std::runtime_error("Failed to create UDP socket");
@@ -120,6 +128,11 @@ public:
         server_addr.sin_port = htons(port);
         if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0)
             throw std::runtime_error("Invalid IP address");
+
+        memset(&plot_addr, 0, sizeof(plot_addr));
+        plot_addr.sin_family = AF_INET;
+        plot_addr.sin_port = htons(57120); // SuperCollider
+        inet_pton(AF_INET, ip, &plot_addr.sin_addr);
 
         // 3. Setup Local Address (Where we listen for /recalibrate)
         // We listen on the same port we send to, or a different one (e.g., 57121)
@@ -132,16 +145,18 @@ public:
             throw std::runtime_error("Failed to bind socket");
         }
 
-        // Initialize 30 processors (for Trill Craft)
-        processed_values_.resize(30);
-        delta_values_.resize(30);
-        for(int i = 0; i < 30; ++i) {
-            base_filters_.emplace_back(0.3f, 0.02f);
+        // Initialize processors only for active pins
+        base_filters_.reserve(NUM_ACTIVE_INPUTS);
+        delta_filters_.reserve(NUM_ACTIVE_INPUTS);
+
+        for(int i = 0; i < NUM_ACTIVE_INPUTS; ++i) {
+            base_filters_.emplace_back(0.3f, 0.01f);
             delta_filters_.emplace_back(); // Initialize the differentiators
         }
 
-        for(int i = 0; i < 8; ++i) {
-            parameter_integrators_.emplace_back(0.995f, 0.5f);
+        parameter_integrators_.reserve(NUM_OUTPUT_CHANNELS);
+        for(int i = 0; i < NUM_OUTPUT_CHANNELS; ++i) {
+            parameter_integrators_.emplace_back(0.05f, 0.0f);
         }
 
     }
@@ -166,6 +181,10 @@ public:
                    (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
             throw std::runtime_error("Failed to send OSC message");
         }
+        if (sendto(sock, buffer, len, 0,
+           (struct sockaddr*)&plot_addr, sizeof(plot_addr)) < 0) {
+            throw std::runtime_error("Failed to send OSC message");
+           }
 
         // std::cout << "Sent OSC with " << count << " values." << std::endl;
     }
@@ -178,7 +197,10 @@ public:
         touchSensor.setPrescaler(2);
         touchSensor.setMode(Trill::RAW);
 
-        const auto OSC_ADDRESS = std::string("/trill/raw");
+        bool initialCalibrationDone = false;
+        int warmupFrames = 0; // New counter
+
+        // const auto OSC_ADDRESS = std::string("/trill/raw");
 
         try {
             while (true) {
@@ -186,9 +208,34 @@ public:
                 handle_incoming_osc();
 
                 if(touchSensor.readI2C() == 0) {
+                    if (!initialCalibrationDone) {
+                        if (warmupFrames < 20) {
+                            warmupFrames++;
+                        } else {
+                            int successCount = 0;
+                            for (int i = 0; i < NUM_ACTIVE_INPUTS; ++i) {
+                                int pinIdx = ACTIVE_PINS[i];
+                                // Attempt recalibrate; if any pin is > 0.8, it returns false
+                                if (base_filters_[i].recalibrate(touchSensor.rawData[pinIdx])) {
+                                    successCount++;
+                                }
+                            }
+
+                            if (successCount >= (NUM_ACTIVE_INPUTS - 2)) {
+                                initialCalibrationDone = true;
+                                std::cout << "Initial baseline synced successfully." << std::endl;
+                            } else {
+                                // Optional: Print a warning that the sensor is blocked
+                                std::cout << "Calibration deferred: Sensor active." << std::endl;
+                            }
+                        }
+                    }
+
                     // 1. Spatial Filtering (Input side)
-                    for (size_t i = 0; i < touchSensor.rawData.size(); ++i) {
-                        processed_values_[i] = base_filters_[i].process(touchSensor.rawData[i]);
+                    for (int i = 0; i < NUM_ACTIVE_INPUTS; ++i) {
+                        int pinIdx = ACTIVE_PINS[i];
+                        float raw_filtered = base_filters_[i].process(touchSensor.rawData[pinIdx]);
+                        processed_values_[i] = std::min(1.0f, raw_filtered * pin_weights_[i]);
                         delta_values_[i] = delta_filters_[i].process(processed_values_[i]);
                     }
 
@@ -198,17 +245,21 @@ public:
 
                     // 3. Temporal Integration Stage (Output side)
                     std::vector<float> integrated_outputs(8);
-                    float global_sensitivity = 2.5f; // Adjust as needed
+                    float global_sensitivity = 5.0f; // Adjust as needed
 
-                    for (int i = 0; i < 8; ++i) {
+                    for (int i = 0; i < NUM_OUTPUT_CHANNELS; ++i) {
                         // Each integrator tracks the state of one parameter
                         integrated_outputs[i] = parameter_integrators_[i].process(influences[i] * global_sensitivity);
                     }
 
                     // 4. Send the integrated parameter values
-                    send_osc_raw_values("/trill/raw", processed_values_);
-                    // send_osc_raw_values("/trill/delta", delta_values_);
-                    send_osc_raw_values("/trill/influx", integrated_outputs);
+                    if ( initialCalibrationDone )
+                    {
+                        send_osc_raw_values("/trill/raw", processed_values_);
+                        send_osc_raw_values("/trill/delta", delta_values_);
+                        send_osc_raw_values("/trill/influx", integrated_outputs);
+                    }
+
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(11));
             }
@@ -225,7 +276,7 @@ public:
 int main(int argc, char* argv[]) {
     try {
         const char* ip = (argc > 1 ? argv[1] : "127.0.0.1");
-        int port = (argc > 2 ? std::stoi(argv[2]) : 57120);
+        int port = (argc > 2 ? std::stoi(argv[2]) : 2002);
 
         TrillClientUDP client(ip, port);
         client.run();

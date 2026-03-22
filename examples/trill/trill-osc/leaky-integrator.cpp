@@ -36,7 +36,7 @@ float LeakyIntegrator::process(float influence) {
     float nextState = target + influence;
 
     // Tick through STK filter and clamp result
-    return clip(filter.tick(nextState), 0.0f, 1.0f);
+    return clip(filter.tick(nextState), -1.0f, 1.0f);
 }
 
 float LeakyIntegrator::getCurrentValue() const { return filter.lastOut(); }

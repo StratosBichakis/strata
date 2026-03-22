@@ -1,14 +1,15 @@
 include(FetchContent)
+
 FetchContent_Declare(
 	oscpp
 	GIT_REPOSITORY https://github.com/kaoskorobase/oscpp.git
-	GIT_TAG        master # oscpp-include
+	GIT_TAG        805365c3b7b7a5c819866040ab434f011dfcfbf9 # oscpp-include
 	GIT_SHALLOW TRUE
+	GIT_SUBMODULES ""
 	SOURCE_SUBDIR     pathThatDoesNotExist
 )
+
 FetchContent_MakeAvailable(oscpp)
-cmake_path(SET OSCPP_DIR ${oscpp_SOURCE_DIR}/include)
 
 add_library(oscpp INTERFACE)
-
-target_include_directories(oscpp INTERFACE ${OSCPP_DIR})
+target_include_directories(oscpp INTERFACE "${oscpp_SOURCE_DIR}/include")

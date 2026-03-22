@@ -2,7 +2,6 @@
 
 #include "BeeThree.h"
 #include "RtAudio.h"
-#include "FileWvOut.h"
 #include "Messager.h"
 #include "SKINImsg.h"
 #include <math.h>

@@ -11,10 +11,8 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
-#include <utility>
 #include <random>
 #include <sys/stat.h>
-#include <libgen.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <map>
@@ -27,9 +25,6 @@ static PerlInterpreter *my_perl;
 
 // Struct to hold bang details
 struct BangDetails {
-    // int bangs;
-    // double tempo;
-    // long last_tempo_change;
     double current_unix_time;
     std::string message;
 };
@@ -37,7 +32,7 @@ struct BangDetails {
 class BangPerlClient  {
 private:
     int sock;
-    struct sockaddr_in server_addr;
+    struct sockaddr_in tcp_server_addr;
     SV* perl_state_hv_ref; // Persistent Perl stat
 
 public:
@@ -48,11 +43,11 @@ public:
         }
 
         // Setup server address structure
-        memset(&server_addr, 0, sizeof(server_addr));
-        server_addr.sin_family = AF_INET;
-        server_addr.sin_port = htons(port);
+        memset(&tcp_server_addr, 0, sizeof(tcp_server_addr));
+        tcp_server_addr.sin_family = AF_INET;
+        tcp_server_addr.sin_port = htons(port);
 
-        if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+        if (inet_pton(AF_INET, ip, &tcp_server_addr.sin_addr) <= 0) {
             close(sock);
             throw std::runtime_error("Invalid address/Address not supported");
         }
@@ -64,8 +59,8 @@ public:
         // We use newRV_noinc because we want this SV* to own the HV
     }
 
-    void connect_to_server() {
-        if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    void connect_tcp() {
+        if (connect(sock, (struct sockaddr*)&tcp_server_addr, sizeof(tcp_server_addr)) < 0) {
             close(sock);
             throw std::runtime_error("Connection failed");
         }
@@ -199,7 +194,6 @@ public:
                 }
 
                 std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>( 64 / 48000.0))); // Approximately 1.333ms
-                // std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>( 4800 / 48000.0))); // Approximately 1.333ms
             }
         } catch (const std::exception& e) {
             std::cerr << "Error during message sending: " << e.what() << std::endl;
@@ -229,7 +223,7 @@ int main(int argc, char* argv[]) {
         int port = (argc > 2) ? std::stoi(argv[2]) : 2001;
         
         BangPerlClient client(ip, port);
-        client.connect_to_server();
+        client.connect_tcp();
         client.run();
         
     } catch (const std::exception& e) {
@@ -239,5 +233,6 @@ int main(int argc, char* argv[]) {
 
     perl_destruct(my_perl);
     perl_free(my_perl);
+    PERL_SYS_TERM();
     return 0;
 }

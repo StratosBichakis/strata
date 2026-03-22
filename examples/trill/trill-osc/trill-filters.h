@@ -16,7 +16,7 @@ public:
     float get_last_value() const;
     float get_baseline() const;
     void set_smoothing(float pole);
-    void recalibrate(float currentInput);
+    bool recalibrate(float currentInput);
 
 private:
     stk::OnePole filter_;

@@ -5,16 +5,16 @@ TrillBaseFilter::TrillBaseFilter(float pole, float thresh)
     : threshold_(thresh), last_value_(0.0f), baseline_(0.0f)
 {
     filter_.setPole(pole);
-    baseline_filter_.setPole(0.9995f);
+    baseline_filter_.setPole(0.9999f);
 }
 
 float TrillBaseFilter::process(float input)
 {
     // 1. Baseline tracking
-    if (std::abs(input - baseline_) < 0.05f)
-    {
+    // if (std::abs(input - baseline_) < 0.05f)
+    // {
         baseline_ = baseline_filter_.tick(input);
-    }
+    // }
 
     // 2. Subtract Baseline & Clamp
     float deBasalized = std::max(0.0f, input - baseline_);
@@ -27,13 +27,25 @@ float TrillBaseFilter::process(float input)
     return last_value_;
 }
 
-void TrillBaseFilter::recalibrate(float currentInput)
+bool TrillBaseFilter::recalibrate(float currentInput)
 {
-    baseline_ = currentInput;
+    if (currentInput > .8f) {
+        return false;
+    }
+    baseline_filter_.setPole(0);
     baseline_filter_.clear();
-    baseline_filter_.tick(currentInput);
+    baseline_ = baseline_filter_.tick(currentInput);
+
+    baseline_filter_.setPole(0.9999f);
+
+    // Snap the signal filter to 0.0 to prevent the "slow ramp"
+    filter_.setPole(0.0f);
     filter_.clear();
-    last_value_ = 0.0f;
+    last_value_ = filter_.tick(0.0f);
+
+    // Restore smoothing (assuming 0.9f as default)
+    filter_.setPole(0.3f);
+    return true;
 }
 
 float TrillBaseFilter::get_last_value() const { return last_value_; }
