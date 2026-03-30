@@ -4,73 +4,105 @@ use warnings;
 use lib ".";
 require './helpers.pl';
 
+my %melodies = (
+    apokoronas_a   => [-5, -4, -2, 0, 2, 3],
+    apokoronas_b   => [2, 3, 5, 7, 5, 3, 2, 0],
+    kolybarianos_a => [-3, -2, -2, 2, 0, 2, -2, 0, -3, -3, -3, -5, -3],
+    kolybarianos_b => [0, 0, 0, -2, -2, -4, -5, -7, -5, -4, -5, -2, -2, -4, -5],
+    lousaakiano_a  => [-1, 0, 2, -1, -1, 0, -1, -4, -5, -5],
+    lousaakiano_b  => [2, 0, 2, 0, -1, -4, -5, -7, -5, -4, -5, -1, 0, -4, -5],
+    kalerianos_a   => [4, 2, -1, 0, 2, 0, -1, -3, -5],
+    kalerianos_b   => [-1, -1, 0, -1, -3, -5, -5, -3, -6, -8],
+);
+
+
 sub _bang_event {
     my ($self) = @_;
-    my $data = $self->{osc_data} // [0,0,0,0,0,0,0,0]; # Fallback
+    my $v = $self->{influx} // [0,0,0,0,0,0,0,0];
+    my $c = $self->{clocks}->{"main"};
 
-    my $c_1 = $self->{clocks}->{"main"};
-    my $c_2 = $self->{clocks}->{"sec"};
+    my @available_keys = sort keys %melodies;
 
-    pattern($c_1, "simple", [0.5, 0.25, 0.25, 0.444], sub {
-        play($self, $c_1, 45, 0.1);
+    # 1. Higher Level: Select Two Segments based on influx[0] and [1]
+    my $num_melodies = scalar @available_keys;
+    my $num_pairs = int($num_melodies / 2);
+
+    # 2. Pick a pair index (0 to $num_pairs - 1) based on influx[0]
+    # my $pair_idx = int(norm_v($v->[0]) * ($num_pairs - 1));
+    my $pair_idx = 1; #0 - 3
+    
+    # 3. Force k1 to be the even start of the pair, and k2 to be the next one
+    my $idx1 = $pair_idx * 2;
+    my $idx2 = $idx1 + 1;
+
+    my $k1 = $available_keys[$idx1];
+    my $k2 = $available_keys[$idx2];
+    
+    my $unit1 = $melodies{$k1};
+    my $unit2 = $melodies{$k2};
+
+    # 4. Higher Level: Select Shakespeare Schema based on influx[2]
+    # -1..-0.5: Chiasmus (1221), -0.5..0.5: Linear (12), 0.5..1: Entangled (1212)
+    my $schema = [1, 1, 2, 2];
+    if ($v->[2] > 0.5)    { $schema = [1, 2, 1, 2]; }
+    elsif ($v->[2] < -0.5) { $schema = [1, 2, 2, 1]; }
+
+    # 5. Structural Assembly
+    my $raw_notes = apply_structural_rhetoric([$unit1, $unit2], $schema);
+    
+    # 6. Symbolize & Regex Mutation (Probabilistic Anadiplosis based on influx[3])
+    my $text = symbolize($raw_notes);
+    $text = apply_rhetoric_schema($text, $v);
+    my $final_notes = desymbolize($text);
+
+
+# --- VOICE 1: HIGH (The Ornament) ---
+    sched($c, "voice_high", sub {
+        my ($s) = @_;
+        my $note_val = $final_notes->[($s->{idx}++) % scalar(@$final_notes)];
+        my $rh = get_ornamental_rhetoric($note_val, 1.0, $v);
+        play($self, $c, 75 + $rh->{note}, $rh->{duration}, $rh->{velocity}*0.6);
+        return $rh->{interval}; 
     });
 
-    sched($c_1, "lo", sub {
-        play($self, $c_1, 65, 0.3);
-        return 0.4432;
+    # --- VOICE 2: MID (The Relator) ---
+    sched($c, "voice_mid", sub {
+        my ($s) = @_;
+        # Offset the index so it's not playing the exact same note as the high voice
+        my $note_val = $final_notes->[($s->{idx}++ + 2) % scalar(@$final_notes)];
+        
+        # Macro-slot of 2.0 beats (half the speed of high, double the speed of bass)
+        my $rh = get_mid_rhetoric($note_val, 2.0, $v);
+        
+        # Transpose to the middle register
+        play($self, $c, 63 + $rh->{note}, $rh->{duration}, $rh->{velocity}* 0.4);
+        return $rh->{interval};
     });
 
-    # Use Sensor 4 to trigger a one-shot event when it crosses a threshold
-        if ($data->[4] > 0.8) {
-            once($self, "sensor_threshold", sub {
-                play($self, $c_1, 80, 1.0);
-            });
-        }
-        if ($data->[4] < 0.5) {
-            # Reset the 'once' so it can trigger again when the sensor drops/rises
-            once_reset($self, "sensor_threshold");
-        }
-
-#     once($self, "do_", sub {
-#         play($self, $c_1, 45, 0.1);
-#     });
-
-    loop($c_2, 12, 7.7, sub {
-        play($self, $c_2, 53, 0.5);
+    # --- VOICE 3: BASS (The Foundation) ---
+    sched($c, "voice_bass", sub {
+        my ($s) = @_;
+        my $note_val = $final_notes->[($s->{idx}++) % scalar(@$final_notes)];
+        my $rh = get_low_rhetoric($note_val, 4.0, $v);
+        play($self, $c, 51 + $rh->{note}, $rh->{duration}, $rh->{velocity}*0.3);
+        return $rh->{interval};
     });
 }
 
-sub clock {
-    my ($self, $name, $tempo) = @_;
-    $self->{clocks} //= {};
-
-    my $c = $self->{clocks}->{$name} //= { accumulated_beats => 0, tempo => $tempo // 120};
-    $c->{tempo} = $tempo // $c->{tempo};
-
-    my $delta_sec = $self->{current_unix_time} - $self->{last_unix_time};
-    $c->{previous_beats} = $c->{accumulated_beats};
-    $c->{accumulated_beats} += $delta_sec * ($c->{tempo} / 60);
-}
 
 sub tick {
     my ($self, $msg) = @_;
     $self->{last_unix_time} //= $self->{current_unix_time};
     $self->{message} = "";
-#     do "./helpers.pl";
 
     if (ref($msg) eq 'ARRAY') {
-        $self->{osc_data} = $msg;
+        $self->{influx} = $msg;
     } else {
         # This case should not happen if C++ is always sending an array ref
 #         print STDERR "Perl received a non-array message: '$msg'\n";
     }
 
-    # Example: Map first 2 sensors to clock tempos
-    my $tempo_1 = 120 + ($self->{osc_data}->[0] * 40); # Range 120-160
-    my $tempo_2 = 110 + ($self->{osc_data}->[1] * 30); # Range 110-140
-
-    clock($self, "main", 136);
-    clock($self, "sec", 125);
+    clock($self, "main", 104);
 
     _bang_event($self);
     process_queue($self);

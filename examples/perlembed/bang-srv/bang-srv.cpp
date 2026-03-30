@@ -1,11 +1,13 @@
 // threebees.cpp STK tutorial program
 
-#include "FMVoices.h"
+#include "Plucked.h"
+#include "BiQuad.h"
 #include "RtAudio.h"
 #include "Messager.h"
 #include "Voicer.h"
 #include "SKINImsg.h"
 #include "stk-config.h"
+#include <cmath>
 
 #include <algorithm>
 using std::min;
@@ -16,6 +18,7 @@ using namespace stk;
 // are shared by the various processing functions.
 struct TickData {
   Voicer voicer;
+  BiQuad hpf;
   Messager messager;
   Skini::Message message;
   int counter;
@@ -24,7 +27,26 @@ struct TickData {
 
   // Default constructor.
   TickData()
-    : counter(0), haveMessage(false), done( false ) {}
+    : counter(0), haveMessage(false), done( false )
+  {
+    setupHPF(32.0, 0.707);
+  }
+
+  // Standard formula for a Second-Order High-Pass Filter
+  void setupHPF(StkFloat freq, StkFloat Q) {
+    StkFloat w0 = 2.0 * M_PI * freq / Stk::sampleRate();
+    StkFloat alpha = sin(w0) / (2.0 * Q);
+    StkFloat cosW0 = cos(w0);
+
+    StkFloat b0 =  (1.0 + cosW0) / 2.0;
+    StkFloat b1 = -(1.0 + cosW0);
+    StkFloat b2 =  (1.0 + cosW0) / 2.0;
+    StkFloat a0 =   1.0 + alpha;
+    StkFloat a1 =  -2.0 * cosW0;
+    StkFloat a2 =   1.0 - alpha;
+
+    hpf.setCoefficients(b0/a0, b1/a0, b2/a0, a1/a0, a2/a0);
+  }
 };
 
 #define DELTA_CONTROL_TICKS 64 // default sample frames between control input checks
@@ -83,6 +105,8 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
 {
   TickData *data = (TickData *) dataPointer;
   StkFloat *samples = (StkFloat *) outputBuffer;
+  StkFloat sample;
+
   int counter, nTicks = (int) nBufferFrames;
 
   while ( nTicks > 0 && !data->done ) {
@@ -101,10 +125,12 @@ int tick( void *outputBuffer, void *inputBuffer, unsigned int nBufferFrames,
     data->counter -= counter;
 
     for ( int i=0; i<counter; i++ ) {
-      float out = data->voicer.tick();
-      for(int ch = 0; ch < 2; ch++){
-        *samples++ = out;
-      }
+      sample = 0.5*data->voicer.tick();
+      sample = data->hpf.tick( sample );
+
+      *samples++ = sample;
+      *samples++ = sample;
+
       nTicks--;
     }
 
@@ -127,8 +153,8 @@ int main()
   int i;
   TickData data;
   RtAudio dac;
-  Instrmnt *instrument[3];
-  for ( i=0; i<2; i++ ) instrument[i] = 0;
+  Instrmnt *instrument[32];
+  for ( i=0; i<32; i++ ) instrument[i] = 0;
 
   // Figure out how many bytes in an StkFloat and setup the RtAudio stream.
   RtAudio::StreamParameters parameters;
@@ -143,15 +169,15 @@ int main()
 
   try {
     // Define and load the BeeThree instruments
-    for ( i=0; i<2; i++ )
-      instrument[i] = new FMVoices;
+    for ( i=0; i<32; i++ )
+      instrument[i] = new Plucked(50.0);
   }
   catch ( StkError & ) {
     goto cleanup;
   }
 
   // "Add" the instruments to the voicer.
-  for ( i=0; i<2; i++ )
+  for ( i=0; i<32; i++ )
     data.voicer.addInstrument( instrument[i] );
 
   if ( data.messager.startSocketInput() == false )
@@ -170,7 +196,7 @@ int main()
   dac.closeStream();
 
  cleanup:
-  for ( i=0; i<2; i++ ) delete instrument[i];
+  for ( i=0; i<32; i++ ) delete instrument[i];
 
   return 0;
 }
